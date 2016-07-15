@@ -14,54 +14,37 @@ __author__ = "Kyle Laskowski"
 __copyright__ = "License CC BY-SA 3.0"
 
 import numpy as np
-from scipy.special import expit
 from scipy.optimize import fmin_l_bfgs_b
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-
-
-def costLogisticRegression(theta, x, y, m):
-    """
-    Here, logistic regression is used to calculate the 'cost' or error
-    in any attempt to fit a function to this data. The gradiant 'grad' is
-    also calculated. This function can be called by an optimization algorithm,
-    which will then hone in on better and better fits to the data.
-    """
-    yTrans = y.transpose()
-    xTrans = x.transpose()
-
-    H = expit(np.dot(x, theta))
-
-    cost = (1. / m) * (np.dot(-yTrans, np.log(H)) - np.dot((1. - yTrans), np.log(1. - H)))
-    grad = (1. / m) * np.dot(xTrans, (H - y))
-
-    return cost, grad
+from regressionLib import costLogisticRegression
 
 csvInput = np.loadtxt("data/ex2data1.txt", delimiter=",")
 
-# To account for python indexes starting at index 0,
-# and shape starting at value 1
-m, n = np.shape(csvInput)
+# Number of features and categories, as they are imported together
+n = np.shape(csvInput)[1]
 
-# n - 1 , as a dimension with n objects ends at index n - 1
+# yData will be the last column (third) while the indexing runs 0, 1, 2
+# in Python, vs starting at 1 in MatLab
 xData = csvInput[:, :n - 1]
 yData = csvInput[:, n - 1]
 
 # Pad with a column of bias values
 xData = np.insert(xData, 0, 1, axis=1)
 
-m, n = np.shape(xData)
-
 # Initialize theta before it is passed to the optimization function
-initialTheta = np.ones(n) / 100.
+initialTheta = np.ones(n)
 
-# and now to call an optimizer
-fit_data = fmin_l_bfgs_b(costLogisticRegression, x0=initialTheta, args=(xData, yData, m))
+# And now to call an optimizer and store the results
+optimizerResults = fmin_l_bfgs_b(costLogisticRegression, x0=initialTheta, args=(xData, yData))
 
-thetaOptimized = fit_data[0]
-gradOptimized = fit_data[2]['grad']
+# Pick out and store some key values returned by the optimizer
+# Including the best values for theta and the gradient
+thetaOptimized = optimizerResults[0]
+gradientOptimized = optimizerResults[2]['grad']
 
-print "fmin_l_bfgs_b required", fit_data[2]['funcalls'], "calls in order to converge on an answer."
+# Feedback to the user showing how many optimizer cycles were required before convergence
+print "fmin_l_bfgs_b required", optimizerResults[2]['funcalls'], "calls in order to converge on an answer."
 
 # Used as a way to separate the two classifications, for display purposes
 trueStudent = np.where(yData == 1)
@@ -69,8 +52,8 @@ falseStudent = np.where(yData == 0)
 
 # Generates a plot of original student data
 plt.title('Student Admittance Prediction Using Logarithmic Regression')
-plt.xlabel("Grade on Test A")
-plt.ylabel("Grade on Test B")
+plt.xlabel('Grade on Test A')
+plt.ylabel('Grade on Test B')
 graphAdmit = plt.scatter(xData[trueStudent, 1], xData[trueStudent, 2], marker='D', c='g', label='Admitted')
 graphExclude = plt.scatter(xData[falseStudent, 1], xData[falseStudent, 2], marker='x', c='r', label='Not Admitted')
 
