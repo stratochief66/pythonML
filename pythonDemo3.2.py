@@ -14,55 +14,42 @@ __author__ = "Kyle Laskowski"
 __copyright__ = "License CC BY-SA 3.0"
 
 import numpy as np
-from scipy.special import expit
 from scipy.optimize import fmin_l_bfgs_b
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from sklearn.preprocessing import PolynomialFeatures
-
-
-def costLogisticRegression(theta, x, y, m, lamb):
-    """
-    Here, logistic regression is used to calculate the 'cost' or error
-    in any attempt to fit a function to this data. The gradient 'grad' is
-    also calculated. This function can be called by an optimization algorithm,
-    which will then hone in on better and better fits to the data.
-    """
-    yTrans = y.transpose()
-    xTrans = x.transpose()
-
-    H = expit(np.dot(x, theta))
-
-    cost = (1. / m) * (np.dot(-yTrans, np.log(H)) - np.dot((1. - yTrans), np.log(1. - H)))
-    grad = (1. / m) * np.dot(xTrans, (H - y))
-
-    return cost, grad
+from regressionLib import costLogisticRegression
 
 csvInput = np.loadtxt("data/ex2data1.txt", delimiter=",")
 
-# To account for python indexes starting at index 0,
-# and shape starting at value 1
-m, n = np.shape(csvInput)
+# Number of features and categories, as they are imported together
+n = np.shape(csvInput)[1]
 
-# n - 1 , as a dimension with n objects ends at index n - 1
+# yData will be the last column (third) while the indexing runs 0, 1, 2
+# in Python, vs starting at 1 in MatLab
 xData = csvInput[:, :n - 1]
 yData = csvInput[:, n - 1]
 
 # Adds a row of bias values, and generates polynomial features derived from the original data
-xDataPoly = PolynomialFeatures(2).fit_transform(xData)
-m, n = np.shape(xDataPoly)
+# The polynomialDimension parameter can be tuned. Set at 2, at most squared features are generated
+polynomialDimension = 2
+xDataPoly = PolynomialFeatures(polynomialDimension).fit_transform(xData)
 
 # Initialize theta before it is passed to the optimization function
-initialTheta = np.ones(n) / 100.
-lamb = 0.000001
+n = np.shape(xDataPoly)[1]
+initialTheta = np.ones(n)
+regularizationCoefficient = 0.00001
 
-# And now to call an optimizer
-fit_data = fmin_l_bfgs_b(costLogisticRegression, x0=initialTheta, args=(xDataPoly, yData, m, lamb))
+# And now to call an optimizer and store the results
+optimizerResults = fmin_l_bfgs_b(costLogisticRegression, x0=initialTheta, args=(xDataPoly, yData, regularizationCoefficient))
 
-thetaOptimized = fit_data[0]
-gradOptimized = fit_data[2]['grad']
+# Pick out and store some key values returned by the optimizer
+# Including the best values for theta and the gradient
+thetaOptimized = optimizerResults[0]
+gradientOptimized = optimizerResults[2]['grad']
 
-print "fmin_l_bfgs_b required", fit_data[2]['funcalls'], "calls in order to converge on an answer."
+# Feedback to the user showing how many optimizer cycles were required before convergence
+print "fmin_l_bfgs_b required", optimizerResults[2]['funcalls'], "calls in order to converge on an answer."
 
 # Used as a way to separate the two classifications, for display purposes
 trueStudent = np.where(yData == 1)
@@ -70,8 +57,8 @@ falseStudent = np.where(yData == 0)
 
 # Generates a plot of original student data
 plt.title('Student Admittance Prediction Using Logarithmic Regression')
-plt.xlabel("Grade on Test A")
-plt.ylabel("Grade on Test B")
+plt.xlabel('Grade on Test A')
+plt.ylabel('Grade on Test B')
 graphAdmit = plt.scatter(xDataPoly[trueStudent, 1], xDataPoly[trueStudent, 2], marker='D', c='g', label='Admitted')
 graphExclude = plt.scatter(xDataPoly[falseStudent, 1], xDataPoly[falseStudent, 2], marker='x', c='r', label='Not Admitted')
 
@@ -89,16 +76,15 @@ polyPrediction = np.zeros(shape=(len(u), len(v)))
 # Calculates and stores predicted category values for each u, v pair
 for i in range(len(u)):
     for j in range(len(v)):
-        tempPoly = PolynomialFeatures(2).fit_transform(np.array((u[i], v[j])).T)
+        tempPoly = PolynomialFeatures(polynomialDimension).fit_transform(np.array((u[i], v[j])).T)
         polyPrediction[i, j] = np.dot(tempPoly, thetaOptimized.reshape(-1,1))
 
-# Plot Boundary
+# Plot Boundary using the above generated data
 plt.contour(u.flatten(), v.flatten(), polyPrediction, 0)
 
 # Create a legend to show the estimated boundary between students and add it to the graph
 fitLegend = mpatches.Patch(color='blue', label='Estimated Boundary')
 firstLegend = plt.legend(handles=[fitLegend], loc=1)
 ax = plt.gca().add_artist(firstLegend)
-
 plt.legend((graphAdmit, graphExclude), ('Admitted', 'Not Admitted'), numpoints=1, loc='lower left', ncol=3, fontsize=11)
 plt.show()
